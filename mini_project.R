@@ -70,7 +70,7 @@ test <- data[-trainIndex, ]
 
 # Logistic Regression
 log_model <- glm(pass ~ gender + race.ethnicity + parental.level.of.education +
-                   lunch + test.preparation.course + math.score + reading.score + writing.score,
+                   lunch + test.preparation.course,
                  data=train, family=binomial)
 
 log_pred <- predict(log_model, newdata=test, type="response")
@@ -84,7 +84,7 @@ tree_pred <- predict(tree_model, newdata=test, type="class")
 confusionMatrix(tree_pred, test$pass)
 
 # Random Forest
-rf_model <- randomForest(pass ~ ., data=train, ntree=100, importance=TRUE)
+rf_model <- randomForest(pass ~ . - avg_score, data = train, ntree = 100, importance = TRUE)
 rf_pred <- predict(rf_model, newdata=test)
 confusionMatrix(rf_pred, test$pass)
 
@@ -96,3 +96,47 @@ varImpPlot(rf_model)
 # 4. Export Cleaned Data for Power BI
 # -----------------------------
 write.csv(data, "cleaned_students_performance.csv", row.names=FALSE)
+
+
+# -----------------------------
+# 5. Future Prediction
+# -----------------------------
+
+# Create a new hypothetical student record
+future_student <- data.frame(
+  gender = factor("female", levels = levels(data$gender)),
+  race.ethnicity = factor("group B", levels = levels(data$race.ethnicity)),
+  parental.level.of.education = factor("bachelor's degree", levels = levels(data$parental.level.of.education)),
+  lunch = factor("standard", levels = levels(data$lunch)),
+  test.preparation.course = factor("completed", levels = levels(data$test.preparation.course)),
+  math.score = 70,
+  reading.score = 80,
+  writing.score = 78
+)
+
+# Predict using the trained Random Forest model
+future_student$avg_score <- mean(c(future_student$math.score,
+                                   future_student$reading.score,
+                                   future_student$writing.score))
+future_pred_class <- predict(rf_model, newdata = future_student)
+
+future_pred_prob <- predict(rf_model, newdata = future_student, type = "prob")
+
+cat("Predicted Pass/Fail:", as.character(future_pred_class), "\n")
+print("Prediction Probabilities:")
+print(future_pred_prob)
+
+# -----------------------------
+# Optional: Predict future average score using Regression
+# -----------------------------
+
+# Train a linear regression model on current data
+score_model <- lm(avg_score ~ gender + race.ethnicity + parental.level.of.education +
+                    lunch + test.preparation.course + math.score + reading.score + writing.score,
+                  data = data)
+
+# Predict average score for the new student
+future_pred_score <- predict(score_model, newdata = future_student)
+
+cat("Predicted Average Score:", round(future_pred_score, 2))
+
